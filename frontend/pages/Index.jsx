@@ -14,6 +14,7 @@ const Index = () => {
 
   // store backend response here
   const [data, setData] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const scrollToUpload = () => {
     uploadRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -22,16 +23,32 @@ const Index = () => {
   const downloadJSON = () => {
     if (!data?.result) return;
 
-    const blob = new Blob(
-      [JSON.stringify(data.result, null, 2)],
-      { type: "application/json" }
-    );
+    try {
+      // Only include essential data, exclude large graph object
+      const reportData = {
+        summary: data.result.summary,
+        suspicious_accounts: data.result.suspicious_accounts,
+        fraud_rings: data.result.fraud_rings,
+        timestamp: new Date().toISOString()
+      };
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "fraud_report.json";
-    a.click();
+      const blob = new Blob(
+        [JSON.stringify(reportData, null, 2)],
+        { type: "application/json" }
+      );
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `fraud_report_${Date.now()}.json`;
+      a.click();
+
+      // Cleanup
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert("Failed to download report");
+    }
   };
 
   return (
@@ -48,13 +65,14 @@ const Index = () => {
             <GraphCard
               graph={data?.graph}
               suspicious={data?.result?.suspicious_accounts}
+              isLoading={isProcessing}
             />
           </div>
 
           {/* RIGHT: STACKED CARDS */}
           <div className="flex flex-col gap-6" ref={uploadRef}>
 
-            <UploadCard onResult={setData} />
+            <UploadCard onResult={setData} onProcessingChange={setIsProcessing} />
 
             <SummaryCard summary={data?.result?.summary} />
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-const UploadCard = ({ onResult }) => {
+const UploadCard = ({ onResult, onProcessingChange }) => {
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -38,6 +38,7 @@ const UploadCard = ({ onResult }) => {
     if (!file) return;
 
     setIsProcessing(true);
+    onProcessingChange?.(true);
 
     try {
       const form = new FormData();
@@ -58,6 +59,7 @@ const UploadCard = ({ onResult }) => {
     }
 
     setIsProcessing(false);
+    onProcessingChange?.(false);
   };
 
   return (

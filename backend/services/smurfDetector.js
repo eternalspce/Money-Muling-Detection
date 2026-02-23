@@ -14,13 +14,14 @@ export function detectSmurfing(transactions){
 
   const suspicious=[];
 
-  Object.entries(fanIn).forEach(([acc,set])=>{
+  // Single pass through both objects
+  for(const [acc,set] of Object.entries(fanIn)){
     if(set.size>=10) suspicious.push({account:acc,pattern:"fan_in"});
-  });
+  }
 
-  Object.entries(fanOut).forEach(([acc,set])=>{
+  for(const [acc,set] of Object.entries(fanOut)){
     if(set.size>=10) suspicious.push({account:acc,pattern:"fan_out"});
-  });
+  }
 
   return suspicious;
 }

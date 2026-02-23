@@ -1,40 +1,58 @@
-export function detectCycles(adj){
+export function detectCycles(adj) {
+  let index = 0;
+  const stack = [];
+  const onStack = new Set();
+  const indices = {};
+  const lowlink = {};
+  const rings = [];
+  let id = 1;
 
-  const rings=[];
-  const seen=new Set();
-  let id=1;
+  function strongconnect(v) {
+    indices[v] = index;
+    lowlink[v] = index;
+    index++;
 
-  function dfs(start,node,path,visited){
+    stack.push(v);
+    onStack.add(v);
 
-    if(path.length>5) return;
+    for (const w of (adj[v] || [])) {
 
-    visited.add(node);
-    path.push(node);
-
-    for(const next of adj[node]||[]){
-
-      if(next===start && path.length>=3){
-
-        const sorted=[...path].sort().join("-");
-        if(!seen.has(sorted)){
-          seen.add(sorted);
-          rings.push({
-            ring_id:"RING_"+String(id++).padStart(3,"0"),
-            member_accounts:[...path],
-            pattern_type:"cycle",
-            risk_score:90
-          });
-        }
+      if (indices[w] === undefined) {
+        strongconnect(w);
+        lowlink[v] = Math.min(lowlink[v], lowlink[w]);
       }
 
-      if(!visited.has(next)) dfs(start,next,path,visited);
+      else if (onStack.has(w)) {
+        lowlink[v] = Math.min(lowlink[v], indices[w]);
+      }
     }
 
-    path.pop();
-    visited.delete(node);
+    // root of SCC
+    if (lowlink[v] === indices[v]) {
+      const component = [];
+      let w;
+
+      do {
+        w = stack.pop();
+        onStack.delete(w);
+        component.push(w);
+      } while (w !== v);
+
+      // only rings with >=3 accounts
+      if (component.length >= 3) {
+        rings.push({
+          ring_id: "RING_" + String(id++).padStart(3, "0"),
+          member_accounts: component,
+          pattern_type: "cycle",
+          risk_score: 90
+        });
+      }
+    }
   }
 
-  Object.keys(adj).forEach(n=>dfs(n,n,[],new Set()));
+  for (const v of Object.keys(adj)) {
+    if (indices[v] === undefined) strongconnect(v);
+  }
 
   return rings;
 }

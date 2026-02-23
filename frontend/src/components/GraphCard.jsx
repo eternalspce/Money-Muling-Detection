@@ -1,9 +1,11 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, Filter } from "lucide-react";
 import cytoscape from "cytoscape";
 
-const GraphCard = ({ graph, suspicious }) => {
+const GraphCard = ({ graph, suspicious, isLoading }) => {
   const cyRef = useRef(null);
   const cyInstance = useRef(null);
+  const [filterMode, setFilterMode] = useState("suspicious"); // "all", "suspicious", "rings"
 
   useEffect(() => {
     if (!cyRef.current || !graph) return;
@@ -18,15 +20,40 @@ const GraphCard = ({ graph, suspicious }) => {
       (suspicious || []).map(s => s.account_id)
     );
 
+    const allNodes = Array.from(graph?.nodes || []);
+    const allEdges = Array.from(graph?.edges || []);
+
+    let nodesToShow = allNodes;
+    let edgesToShow = allEdges;
+
+    // Filter based on mode
+    if (filterMode === "suspicious" && suspicious?.length > 0) {
+      // Only show suspicious accounts + their direct connections
+      const suspiciousArray = suspicious.slice(0, 100); // Limit to top 100
+      const suspiciousIds = new Set(suspiciousArray.map(s => s.account_id));
+      const connectedAccounts = new Set(suspiciousIds);
+
+      // Add accounts connected to suspicious ones
+      allEdges.forEach(e => {
+        if (suspiciousIds.has(e.source)) connectedAccounts.add(e.target);
+        if (suspiciousIds.has(e.target)) connectedAccounts.add(e.source);
+      });
+
+      nodesToShow = allNodes.filter(n => connectedAccounts.has(n));
+      edgesToShow = allEdges.filter(
+        e => connectedAccounts.has(e.source) && connectedAccounts.has(e.target)
+      );
+    }
+
     const elements = [
-      ...(graph.nodes || []).map(id => ({
+      ...nodesToShow.map(id => ({
         data: {
           id,
-          label: id,
+          label: id.substring(0, 6), // Truncate long IDs
           suspicious: suspiciousSet.has(id)
         }
       })),
-      ...(graph.edges || []).map(e => ({
+      ...edgesToShow.map(e => ({
         data: { source: e.source, target: e.target }
       }))
     ];
@@ -75,11 +102,19 @@ const GraphCard = ({ graph, suspicious }) => {
 
       layout: {
         name: "cose",
-        animate: true,
-        animationDuration: 800,
-        nodeRepulsion: () => 6000,
-        idealEdgeLength: () => 100,
-        padding: 40
+        directed: false,
+        animate: false,
+        nodeRepulsion: (node) => 10000,
+        nodeOverlap: 100,
+        idealEdgeLength: 150,
+        edgeElasticity: 0.1,
+        nestingFactor: 2,
+        gravity: 0.5,
+        numIter: 2500,
+        initialTemp: 200,
+        coolingFactor: 0.95,
+        minTemp: 1,
+        padding: 80
       },
 
       userZoomingEnabled: true,
@@ -92,7 +127,7 @@ const GraphCard = ({ graph, suspicious }) => {
       cyInstance.current = null;
     };
 
-  }, [graph, suspicious]);
+  }, [graph, suspicious, filterMode]);
 
   return (
     <div className="flex h-full flex-col rounded-xl border border-gray-800 bg-gray-900 shadow-sm">
@@ -106,19 +141,44 @@ const GraphCard = ({ graph, suspicious }) => {
           </p>
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-gray-400">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500" />
-            Normal
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
-            Suspicious
-          </span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <Filter className="h-4 w-4" />
+            <select
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value)}
+              className="rounded bg-gray-800 px-2 py-1 text-xs text-white border border-gray-700 hover:border-gray-600"
+            >
+              <option value="suspicious">Show Suspicious Only</option>
+              <option value="all">Show All Accounts</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500" />
+              Normal
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-500" />
+              Suspicious
+            </span>
+          </div>
         </div>
       </div>
 
-      <div id="cy" ref={cyRef} className="min-h-100 flex-1" />
+      <div id="cy" ref={cyRef} className="min-h-100 relative flex-1">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-b-xl bg-black bg-opacity-50 z-50">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              <p className="text-sm font-medium text-white">
+                Processing transactions...
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

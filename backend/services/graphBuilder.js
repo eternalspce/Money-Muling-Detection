@@ -1,21 +1,34 @@
 export function buildGraph(transactions){
-  const adj={};
-  const nodes=new Set();
-  const edges=[];
+
+  const adj = new Map();
+  const nodes = new Set();
+  const edges = [];
 
   for(const t of transactions){
-    nodes.add(t.sender);
-    nodes.add(t.receiver);
 
-    if(!adj[t.sender]) adj[t.sender]=[];
-    adj[t.sender].push(t.receiver);
+    const s = t.sender;     // already trimmed in upload.js
+    const r = t.receiver;   // already trimmed in upload.js
 
-    edges.push({source:t.sender,target:t.receiver});
+    nodes.add(s);
+    nodes.add(r);
+
+    let list = adj.get(s);
+    if(list === undefined){
+      list = [];
+      adj.set(s,list);
+    }
+
+    list.push(r);
+    edges.push({ source: s, target: r });
   }
 
+  // convert Map → plain object for JSON serialization
+  const adjObj = Object.create(null);
+  for(const [k,v] of adj) adjObj[k]=v;
+
   return {
-  adj,
-  nodes: Array.from(nodes),   
-  edges
-};
+    adj: adjObj,
+    nodes: Array.from(nodes), // convert to array for JSON serialization
+    edges,
+  };
 }
